@@ -1,9 +1,30 @@
 // This is free and unencumbered software released into the public domain.
 // See LICENSE for details
 
-const {app, BrowserWindow, Menu} = require('electron');
-const log = require('electron-log');
-const {autoUpdater} = require("electron-updater");
+const { app, BrowserWindow, Menu, ipcMain } = require("electron");
+const log = require("electron-log");
+const { autoUpdater } = require("electron-updater");
+const keytar = require("keytar");
+
+const setMainPassword = () =>
+	keytar.setPassword("package-electron", "user", "password");
+const getMainPassword = () => keytar.getPassword("package-electron", "user");
+const getRendererPassword = () =>
+	keytar.getPassword("package-electron-renderer", "user");
+
+ipcMain.handle("getRendererPassword", async () => {
+	let rendererPassword = await getRendererPassword();
+	return rendererPassword;
+});
+
+ipcMain.handle("getMainPassword", async () => {
+	let mainPassword = await getMainPassword();
+	if (!mainPassword) {
+		await setMainPassword();
+		mainPassword = await getMainPassword();
+	}
+	return mainPassword;
+});
 
 //-------------------------------------------------------------------
 // Logging
@@ -14,34 +35,35 @@ const {autoUpdater} = require("electron-updater");
 // but it sure makes debugging easier :)
 //-------------------------------------------------------------------
 autoUpdater.logger = log;
-autoUpdater.logger.transports.file.level = 'info';
-log.info('App starting...');
+autoUpdater.logger.transports.file.level = "info";
+log.info("App starting...");
 
 //-------------------------------------------------------------------
 // Define the menu
 //
 // THIS SECTION IS NOT REQUIRED
 //-------------------------------------------------------------------
-let template = []
-if (process.platform === 'darwin') {
-  // OS X
-  const name = app.getName();
-  template.unshift({
-    label: name,
-    submenu: [
-      {
-        label: 'About ' + name,
-        role: 'about'
-      },
-      {
-        label: 'Quit',
-        accelerator: 'Command+Q',
-        click() { app.quit(); }
-      },
-    ]
-  })
+let template = [];
+if (process.platform === "darwin") {
+	// OS X
+	const name = app.getName();
+	template.unshift({
+		label: name,
+		submenu: [
+			{
+				label: "About " + name,
+				role: "about",
+			},
+			{
+				label: "Quit",
+				accelerator: "Command+Q",
+				click() {
+					app.quit();
+				},
+			},
+		],
+	});
 }
-
 
 //-------------------------------------------------------------------
 // Open a window that displays the version
@@ -55,53 +77,59 @@ if (process.platform === 'darwin') {
 let win;
 
 function sendStatusToWindow(text) {
-  log.info(text);
-  win.webContents.send('message', text);
+	log.info(text);
+	win.webContents.send("message", text);
 }
 function createDefaultWindow() {
-  win = new BrowserWindow({
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    }
-  });
-  win.webContents.openDevTools();
-  win.on('closed', () => {
-    win = null;
-  });
-  win.loadURL(`file://${__dirname}/version.html#v${app.getVersion()}`);
-  return win;
+	win = new BrowserWindow({
+		webPreferences: {
+			nodeIntegration: true,
+			preload: __dirname + "/preload.js",
+		},
+	});
+	win.webContents.openDevTools();
+	win.on("closed", () => {
+		win = null;
+	});
+	win.loadURL(`file://${__dirname}/version.html`);
+	return win;
 }
-autoUpdater.on('checking-for-update', () => {
-  sendStatusToWindow('Checking for update...');
-})
-autoUpdater.on('update-available', (info) => {
-  sendStatusToWindow('Update available.');
-})
-autoUpdater.on('update-not-available', (info) => {
-  sendStatusToWindow('Update not available.');
-})
-autoUpdater.on('error', (err) => {
-  sendStatusToWindow('Error in auto-updater. ' + err);
-})
-autoUpdater.on('download-progress', (progressObj) => {
-  let log_message = "Download speed: " + progressObj.bytesPerSecond;
-  log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-  log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-  sendStatusToWindow(log_message);
-})
-autoUpdater.on('update-downloaded', (info) => {
-  sendStatusToWindow('Update downloaded');
+autoUpdater.on("checking-for-update", () => {
+	sendStatusToWindow("Checking for update...");
 });
-app.on('ready', function() {
-  // Create the Menu
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+autoUpdater.on("update-available", (info) => {
+	sendStatusToWindow("Update available.");
+});
+autoUpdater.on("update-not-available", (info) => {
+	sendStatusToWindow("Update not available.");
+});
+autoUpdater.on("error", (err) => {
+	sendStatusToWindow("Error in auto-updater. " + err);
+});
+autoUpdater.on("download-progress", (progressObj) => {
+	let log_message = "Download speed: " + progressObj.bytesPerSecond;
+	log_message = log_message + " - Downloaded " + progressObj.percent + "%";
+	log_message =
+		log_message +
+		" (" +
+		progressObj.transferred +
+		"/" +
+		progressObj.total +
+		")";
+	sendStatusToWindow(log_message);
+});
+autoUpdater.on("update-downloaded", (info) => {
+	sendStatusToWindow("Update downloaded");
+});
+app.on("ready", function () {
+	// Create the Menu
+	const menu = Menu.buildFromTemplate(template);
+	Menu.setApplicationMenu(menu);
 
-  createDefaultWindow();
+	createDefaultWindow();
 });
-app.on('window-all-closed', () => {
-  app.quit();
+app.on("window-all-closed", () => {
+	app.quit();
 });
 
 //
@@ -114,8 +142,8 @@ app.on('window-all-closed', () => {
 // This will immediately download an update, then install when the
 // app quits.
 //-------------------------------------------------------------------
-app.on('ready', function()  {
-  autoUpdater.checkForUpdatesAndNotify();
+app.on("ready", function () {
+	autoUpdater.checkForUpdatesAndNotify();
 });
 
 //-------------------------------------------------------------------
@@ -143,5 +171,5 @@ app.on('ready', function()  {
 // autoUpdater.on('download-progress', (progressObj) => {
 // })
 // autoUpdater.on('update-downloaded', (info) => {
-//   autoUpdater.quitAndInstall();  
+//   autoUpdater.quitAndInstall();
 // })

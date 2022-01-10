@@ -1,24 +1,44 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Electron Updater Example</title>
-</head>
-<body>
-  Current version: <span id="version">vX.Y.Z</span>
-  <div id="messages"></div>
-<script>
-// Display the current version
-let version = window.location.hash.substring(1);
-document.getElementById('version').innerText = version;
-
-// Listen for messages
-const {ipcRenderer} = require('electron');
-ipcRenderer.on('message', function(event, text) {
-  var container = document.getElementById('messages');
-  var message = document.createElement('div');
-  message.innerHTML = text;
-  container.appendChild(message);
-})
-</script>
-</body>
+	<head>
+		<title>Electron Updater Example</title>
+	</head>
+	<body>
+		Current version: <span id="version">vX.Y.Z</span>
+		<div id="messages"></div>
+		<div>
+			<h6>Main</h6>
+			<p>
+				<b>Main password:</b><span id="main.mainPassword"></span>
+				<button onclick="getPassword('main.mainPassword')">Get</button>
+			</p>
+			<p>
+				<b>Renderer password:</b><span id="main.rendererPassword"></span>
+				<button onclick="getPassword('main.rendererPassword')">Get</button>
+			</p>
+		</div>
+		<div>
+			<h6>Renderer</h6>
+			<p>
+				<b>Main password:</b><span id="renderer.mainPassword"></span>
+				<button onclick="getPassword('renderer.mainPassword')">Get</button>
+			</p>
+			<p>
+				<b>Renderer password:</b><span id="renderer.rendererPassword"></span>
+				<button onclick="getPassword('renderer.rendererPassword')">Get</button>
+			</p>
+		</div>
+		<script>
+			console.log(window.electron);
+			async function getPassword(key) {
+				const keySeq = key.split(".");
+				const fn = window.electron[keySeq[0]][keySeq[1]];
+				console.log("GET PASSWORD", key, fn);
+				const element = document.getElementById(key);
+				const password = await fn();
+				console.log({ password });
+				element.innerText = password;
+			}
+		</script>
+	</body>
 </html>
